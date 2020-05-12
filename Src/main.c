@@ -46,27 +46,10 @@ void Error_Handler(void);
 static void MX_GPIO_Init(void);
 static void MX_SDIO_SD_Init(void);
 static void UART_PRINTF_Init(void);
-float a=0.001567;
-
-uint8_t buffer[20]="hjhjkl";
-
-/* UART handler declaration */
-UART_HandleTypeDef UartHandle;
-
-/* Private function prototypes -----------------------------------------------*/
-#ifdef __GNUC__
-  /* With GCC, small printf (option LD Linker->Libraries->Small printf
-     set to 'Yes') calls __io_putchar() */
-  #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
-#else
-  #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif /* __GNUC__ */
+void create_log_file(void);
 float ieee_float(uint32_t f);
-UINT BytesWritten;
-uint8_t file_name[10]="12t5.txt";
-char* path;
-	
-	
+uint8_t	init_log_sd(void);
+
 char *dec32(unsigned long i) {
 	static char str[16];
 	char *s = str + sizeof(str);
@@ -81,13 +64,28 @@ char *dec32(unsigned long i) {
 	return (s);
 }
 char str_dct[256];
-float write_speed;
-uint16_t m;
-uint32_t start_cnt, stop_cnt;
+char* path;
+
+/* UART handler declaration */
+UART_HandleTypeDef UartHandle;
+
+/* Private function prototypes -----------------------------------------------*/
+#ifdef __GNUC__
+  /* With GCC, small printf (option LD Linker->Libraries->Small printf
+     set to 'Yes') calls __io_putchar() */
+  #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+#else
+  #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+#endif /* __GNUC__ */
+
+UINT BytesWritten;
+uint8_t log_file_name[10]="log2.txt";
+
 RNG_HandleTypeDef hrng;
 volatile uint32_t rng_result;
 float rng_result_f;
 HAL_RNG_StateTypeDef rng_state;
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -118,23 +116,80 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 	UART_PRINTF_Init();
-	printf("\n\r SD card SDIO 4 bit\n\r");
-	printf("init SD card...!\n\r");
-	if(BSP_SD_Init()==MSD_OK)
+
+	printf("Iit SD card...!\n\r");
+	if (init_log_sd()) {
+		printf("Check the SDcard's presence!\n\r");
+	}
+	else {
+		create_log_file();
+	}
+	char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
+	char buffer_to_sd[100];
+	float pre_tick;
+	float l_timestamp;
+	pre_tick = HAL_GetTick();
+	/* USER CODE END 2 */
+	
+	while (1)
 	{
+		/*
+		While loop = 100Hz
+		*/
+		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
+		
+		printf("%f\n\r", l_timestamp);
+		char temp[20];
+	//	strcpy(buffer_to_sd, "");
+		sprintf(temp, "%f ", l_timestamp);
+		/*
+		The first data so we can use strcpy instead of strcat
+		*/
+		strcpy(buffer_to_sd, temp);
+		
+		rng_state = HAL_RNG_GetState(&hrng);
+		if (rng_state == HAL_RNG_STATE_READY) {
+			rng_result = HAL_RNG_GetRandomNumber(&hrng);
+			rng_result_f = ieee_float(rng_result);
+		}
+		/*
+		The second number
+		*/
+		sprintf(temp, "%f ", (float)rng_result);
+		strcat(buffer_to_sd, temp);
+		/* The third number */
+		sprintf(temp, "%f ", rng_result/33.0f);
+		strcat(buffer_to_sd, temp);
+		
+		sprintf(temp, "%f ", -233.0f);
+		strcat(buffer_to_sd, temp);
+		
+		strcat(buffer_to_sd, "\r");
+		//printf("%s", strcat(buffer_to_sd,"\0"));
+		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
+		f_sync(&myfile);	
+
+		
+		HAL_Delay(15);
+		
+	}
+}
+uint8_t	init_log_sd(void) {
+		if(BSP_SD_Init() == MSD_OK)
+		{
 		printf("init SD card succeed!\n\r");
-		fresult=f_mount(&fatfs,"",1);
+		fresult = f_mount(&fatfs,"",1);
 		HAL_SD_ConfigWideBusOperation(&hsd, SDIO_BUS_WIDE_4B);
-		/* Create File with name "stm32.txt" and file access is write */
+	
 		if (fresult != FR_OK) {
 			Error_Handler();
 		}
 		printf("Mount SD card successfully\n\r");
-/*
-	list dir content code
-	prior to calling this code, sd is mounted
-*/
-	fresult = f_open(&myfile, "DIR_LIST.TXT", FA_CREATE_ALWAYS | FA_WRITE);
+		/*
+			list dir content code
+			prior to calling this code, sd is mounted
+		*/
+		fresult = f_open(&myfile, "DIR_LIST.TXT", FA_CREATE_ALWAYS | FA_WRITE);
 
 		if (fresult == FR_OK) {
 			UINT BytesWritten2;
@@ -184,22 +239,26 @@ int main(void)
 					printf("%s", str_dct);
 				}
 			}
-/**/
-			
+			/*	
+				Save file
+			*/
 			f_sync(&myfile);		
 			fresult = f_close(&myfile); // DIR.TXT
-		//	f_mount(NULL, "", 1);
 		}
+		return 0;
 	}
 	else {
 		printf("init SD card failed!\n\r");
+		return 1;
 	}
-			fresult = f_open(&myfile, "LOG.TXT", FA_CREATE_NEW);
+}
+void create_log_file(void) {
+		fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_CREATE_NEW);
 		if (fresult != FR_OK) {
 			if (fresult == FR_EXIST) {
 				printf("file name is already exist!\n\r");
 				printf("try to overridely create a new file\n\r");
-				fresult = f_open(&myfile, "LOG.TXT", FA_CREATE_ALWAYS|FA_WRITE);
+				fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_CREATE_ALWAYS|FA_WRITE);
 				if (fresult != FR_OK) {
 					Error_Handler();
 				}
@@ -214,60 +273,11 @@ int main(void)
 		char copter_test_str[] = "Hello I'm Thong\n\r";
 		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
 		f_sync(&myfile);
-		char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
-		char buffer_to_sd[100];
-		float pre_tick;
-		float l_timestamp;
-		pre_tick = HAL_GetTick();
-	while (1)
-	{
 		/*
-		While loop = 100Hz
+		
 		*/
-		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
-		
-		printf("%f\n\r", l_timestamp);
-		char temp[20];
-	//	strcpy(buffer_to_sd, "");
-		sprintf(temp, "%f ", l_timestamp);
-		/*
-		The first data so we can use strcpy instead of strcat
-		*/
-		strcpy(buffer_to_sd, temp);
-		
-		rng_state = HAL_RNG_GetState(&hrng);
-		if (rng_state == HAL_RNG_STATE_READY) {
-			rng_result = HAL_RNG_GetRandomNumber(&hrng);
-			rng_result_f = ieee_float(rng_result);
-		}
-		/*
-		The second number
-		*/
-		sprintf(temp, "%f ", (float)rng_result);
-		/*
-		The first data so we can use strcpy instead of strcat
-		*/
-		//strcpy(buffer_to_sd, temp);
-		
-		strcat(buffer_to_sd, temp);
-		/* The third number */
-		sprintf(temp, "%f ", rng_result/33.0f);
-		strcat(buffer_to_sd, temp);
-		
-		sprintf(temp, "%f ", -233.0f);
-		strcat(buffer_to_sd, temp);
-		
-		strcat(buffer_to_sd, "\r");
-		//printf("%s", strcat(buffer_to_sd,"\0"));
-		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
-		f_sync(&myfile);	
-
-		
-		HAL_Delay(10);
-		
-	}
-}
-
+		//f_close(&myfile);
+	}		
 float ieee_float(uint32_t f)
 {
     //static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
