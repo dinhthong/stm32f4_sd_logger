@@ -1,0 +1,11 @@
+# stm32 keil c build output
+**/build
+#for MDK-ARM IDE generated user files 
+*.uvgui*
+*.uvoptx
+*.lst
+*.vscode
+*.o
+*.d
+*.crf
+**/Drivers
