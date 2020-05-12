@@ -37,7 +37,7 @@ uint8_t rx_buffer[100],byte_read;
 SD_HandleTypeDef hsd;
 
 /* USER CODE BEGIN PV */
-
+static void MX_RNG_Init(void);
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -61,6 +61,7 @@ UART_HandleTypeDef UartHandle;
 #else
   #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
+float ieee_float(uint32_t f);
 UINT BytesWritten;
 uint8_t file_name[10]="12t5.txt";
 char* path;
@@ -83,8 +84,9 @@ char str_dct[256];
 float write_speed;
 uint16_t m;
 uint32_t start_cnt, stop_cnt;
-RNG_HandleTypeDef rng;
+RNG_HandleTypeDef hrng;
 volatile uint32_t rng_result;
+float rng_result_f;
 HAL_RNG_StateTypeDef rng_state;
 int main(void)
 {
@@ -111,9 +113,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
 	
-	//RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_RNG, ENABLE);
-	rng.Instance = RNG;
-	HAL_RNG_Init(&rng);
+	MX_RNG_Init();
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
@@ -194,9 +194,6 @@ int main(void)
 	else {
 		printf("init SD card failed!\n\r");
 	}
-	
-//	fresult = f_open(&myfile, "LOG_COPTER.TXT", FA_CREATE_ALWAYS | FA_WRITE);
-	
 			fresult = f_open(&myfile, "LOG.TXT", FA_CREATE_NEW);
 		if (fresult != FR_OK) {
 			if (fresult == FR_EXIST) {
@@ -216,8 +213,7 @@ int main(void)
 		printf("Open file successfully\n\r");
 		char copter_test_str[] = "Hello I'm Thong\n\r";
 		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
-		f_sync(&myfile);					
-		//f_mount(NULL, "", 1);
+		f_sync(&myfile);
 		char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
 		char buffer_to_sd[100];
 		float pre_tick;
@@ -225,7 +221,6 @@ int main(void)
 		pre_tick = HAL_GetTick();
 	while (1)
 	{
-		//printf("\n\r While loop\n\r");
 		/*
 		While loop = 100Hz
 		*/
@@ -239,19 +234,47 @@ int main(void)
 		The first data so we can use strcpy instead of strcat
 		*/
 		strcpy(buffer_to_sd, temp);
-		strcat(buffer_to_sd, "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r");
+		
+		rng_state = HAL_RNG_GetState(&hrng);
+		if (rng_state == HAL_RNG_STATE_READY) {
+			rng_result = HAL_RNG_GetRandomNumber(&hrng);
+			rng_result_f = ieee_float(rng_result);
+		}
+		/*
+		The second number
+		*/
+		sprintf(temp, "%f ", (float)rng_result);
+		/*
+		The first data so we can use strcpy instead of strcat
+		*/
+		//strcpy(buffer_to_sd, temp);
+		
+		strcat(buffer_to_sd, temp);
+		/* The third number */
+		sprintf(temp, "%f ", rng_result/33.0f);
+		strcat(buffer_to_sd, temp);
+		
+		sprintf(temp, "%f ", -233.0f);
+		strcat(buffer_to_sd, temp);
+		
+		strcat(buffer_to_sd, "\r");
 		//printf("%s", strcat(buffer_to_sd,"\0"));
 		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
 		f_sync(&myfile);	
-		rng_state = HAL_RNG_GetState(&rng);
-		if (rng_state == HAL_RNG_STATE_READY) {
-			rng_result = HAL_RNG_GetRandomNumber(&rng);
-		}
-		HAL_Delay(100);
+
+		
+		HAL_Delay(10);
 		
 	}
 }
 
+float ieee_float(uint32_t f)
+{
+    //static_assert(sizeof(float) == sizeof f, "`float` has a weird size.");
+    float ret;
+    memcpy(&ret, &f, sizeof(float));
+    return ret;
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -346,7 +369,10 @@ static void UART_PRINTF_Init(void) {
   }
 }
 
-
+static void MX_RNG_Init(void) {
+	hrng.Instance = RNG;
+	HAL_RNG_Init(&hrng);
+}
 /**
   * @brief GPIO Initialization Function
   * @param None
