@@ -123,47 +123,6 @@ int main(void)
 			Error_Handler();
 		}
 		printf("Mount SD card successfully\n\r");
-		/*
-			create a new file
-		*/
-		fresult = f_open(&myfile, (const TCHAR*)file_name, FA_CREATE_NEW);
-		if (fresult != FR_OK) {
-			if (fresult == FR_EXIST) {
-				printf("file name is already exist!\n\r");
-				printf("try to overridely create a new file\n\r");
-				fresult = f_open(&myfile, (const TCHAR*)file_name, FA_CREATE_ALWAYS|FA_WRITE);
-				if (fresult != FR_OK) {
-					Error_Handler();
-				}
-				printf("override file ok\n\r");
-			}
-		}
-		else {
-			printf("created a new file ok\n\r");
-		}
-			
-		printf("Open file successfully\n\r");
-		
-   // f_printf(&myfile,"sdadsadadsadxxxxxxxxxxxxxxxxxxxx\n\r");
-		
-		start_cnt = HAL_GetTick();
-		char dum_str[256] = "zzzzzzzzzzzaaaaaaaaaaaaaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxzzzHelloworldcxzcxzcxzczczczcxzcxzcxzcxzcxzcxxxxxxxxxxsssssssssssaaaaaaqqqqqqqqqqq\n\r";
-		//uint32_t byte_cnt;
-		for (m = 0; m < 1500; m++) {
-				fresult = f_write(&myfile, dum_str, strlen(dum_str), &BytesWritten);
-				byte_cnt+=BytesWritten;
-		}
-		// flush cached data
-		f_sync(&myfile);					
-		f_close(&myfile);
-		stop_cnt = HAL_GetTick();
-float written_mb;
-				written_mb = (float)byte_cnt/1024.0f/1024.0f;
-	printf("written mega bytes: %f\n\r", written_mb);
-		write_speed = (float)written_mb*1024/((stop_cnt - start_cnt)*0.001f);
-
-		//write_speed_mb = write_speed;
-				printf("write speed in KB/s: %f\n\r", write_speed);
 /*
 	list dir content code
 	prior to calling this code, sd is mounted
@@ -250,20 +209,35 @@ float written_mb;
 		printf("Open file successfully\n\r");
 		char copter_test_str[] = "Hello I'm Thong\n\r";
 		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
-				f_sync(&myfile);					
-		//f_close(&myfile);
+		f_sync(&myfile);					
 		//f_mount(NULL, "", 1);
 		char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
+		char buffer_to_sd[100];
+		float pre_tick;
+		float l_timestamp;
+		pre_tick = HAL_GetTick();
 	while (1)
 	{
 		//printf("\n\r While loop\n\r");
 		/*
 		While loop = 100Hz
 		*/
+		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
 		
-		fresult = f_write(&myfile, copter_test_str2, strlen(copter_test_str2), &BytesWritten);
+		printf("%f\n\r", l_timestamp);
+		char temp[20];
+	//	strcpy(buffer_to_sd, "");
+		sprintf(temp, "%f ", l_timestamp);
+		/*
+		The first data so we can use strcpy instead of strcat
+		*/
+		strcpy(buffer_to_sd, temp);
+		strcat(buffer_to_sd, "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r");
+		//printf("%s", strcat(buffer_to_sd,"\0"));
+		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
 		f_sync(&myfile);	
-		HAL_Delay(10);
+		
+		HAL_Delay(100);
 		
 	}
 }
