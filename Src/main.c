@@ -46,9 +46,12 @@ void Error_Handler(void);
 static void MX_GPIO_Init(void);
 static void MX_SDIO_SD_Init(void);
 static void UART_PRINTF_Init(void);
+/* SD logging */
 void create_log_file(void);
+void write_to_sd_buffer(char buff[], float log_data);
 float ieee_float(uint32_t f);
 uint8_t	init_log_sd(void);
+void do_sd_logging(void);
 
 char *dec32(unsigned long i) {
 	static char str[16];
@@ -79,13 +82,14 @@ UART_HandleTypeDef UartHandle;
 #endif /* __GNUC__ */
 
 UINT BytesWritten;
-uint8_t log_file_name[10]="log2.txt";
+uint8_t log_file_name[10]="xtx.txt";
 
 RNG_HandleTypeDef hrng;
 volatile uint32_t rng_result;
 float rng_result_f;
 HAL_RNG_StateTypeDef rng_state;
-
+float l_timestamp;
+char buffer_to_sd[300];
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -117,31 +121,38 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	UART_PRINTF_Init();
 
-	printf("Iit SD card...!\n\r");
+	printf("Init SD card...!\n\r");
 	if (init_log_sd()) {
 		printf("Check the SDcard's presence!\n\r");
 	}
 	else {
 		create_log_file();
 	}
-	char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
-	char buffer_to_sd[100];
-	float pre_tick;
-	float l_timestamp;
-	pre_tick = HAL_GetTick();
-	/* USER CODE END 2 */
+	//char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
 	
+	float pre_tick;
+	
+	pre_tick = HAL_GetTick();
+	
+	/* USER CODE END 2 */
+
 	while (1)
 	{
+		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
+		do_sd_logging();
 		/*
 		While loop = 100Hz
 		*/
-		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
+
+		f_sync(&myfile);	
+
+		HAL_Delay(20);
 		
-		printf("%f\n\r", l_timestamp);
+	}
+}
+void do_sd_logging(void) {
 		char temp[20];
-	//	strcpy(buffer_to_sd, "");
-		sprintf(temp, "%f ", l_timestamp);
+		sprintf(temp, "%0.3f ", l_timestamp);
 		/*
 		The first data so we can use strcpy instead of strcat
 		*/
@@ -152,27 +163,22 @@ int main(void)
 			rng_result = HAL_RNG_GetRandomNumber(&hrng);
 			rng_result_f = ieee_float(rng_result);
 		}
-		/*
-		The second number
-		*/
-		sprintf(temp, "%f ", (float)rng_result);
-		strcat(buffer_to_sd, temp);
-		/* The third number */
-		sprintf(temp, "%f ", rng_result/33.0f);
-		strcat(buffer_to_sd, temp);
-		
-		sprintf(temp, "%f ", -233.0f);
-		strcat(buffer_to_sd, temp);
-		
-		strcat(buffer_to_sd, "\r");
-		//printf("%s", strcat(buffer_to_sd,"\0"));
-		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
-		f_sync(&myfile);	
 
+		write_to_sd_buffer(buffer_to_sd, rng_result);
+
+		write_to_sd_buffer(buffer_to_sd, (float)rng_result/33.0f);
+
+		write_to_sd_buffer(buffer_to_sd, -233.0f);
+
+		strcat(buffer_to_sd, "\r");
 		
-		HAL_Delay(15);
-		
-	}
+		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
+			printf("%s\n\r", strcat(buffer_to_sd,"\0"));
+}
+void write_to_sd_buffer(char buff[], float log_data) {
+		char temp2[20];
+		sprintf(temp2, "%0.3f ", log_data);
+		strcat(buff, temp2);
 }
 uint8_t	init_log_sd(void) {
 		if(BSP_SD_Init() == MSD_OK)
@@ -256,27 +262,29 @@ void create_log_file(void) {
 		fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_CREATE_NEW);
 		if (fresult != FR_OK) {
 			if (fresult == FR_EXIST) {
-				printf("file name is already exist!\n\r");
-				printf("try to overridely create a new file\n\r");
+				printf("File is already exist!\n\r");
+				printf("Try to overridely create a new file\n\r");
 				fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_CREATE_ALWAYS|FA_WRITE);
 				if (fresult != FR_OK) {
 					Error_Handler();
 				}
-				printf("override file ok\n\r");
+				printf("Override file ok\n\r");
 			}
 		}
 		else {
-			printf("created a new file ok\n\r");
+			printf("Created a new file ok\n\r");
 		}
-			
-		printf("Open file successfully\n\r");
-		char copter_test_str[] = "Hello I'm Thong\n\r";
+		printf("Ready to log with file:%s\n\r", log_file_name);
+		
+		char copter_test_str[] = "Dummy\n\r";
 		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
 		f_sync(&myfile);
 		/*
-		
+		Close here and then open again, in order to fix the file won't save at first
 		*/
-		//f_close(&myfile);
+		f_close(&myfile);
+		fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_OPEN_EXISTING|FA_WRITE);
+		
 	}		
 float ieee_float(uint32_t f)
 {
