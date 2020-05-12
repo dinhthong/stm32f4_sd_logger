@@ -46,3 +46,6 @@ https://github.com/tudelft/highspeedlogger
 - https://www.st.com/resource/en/user_manual/dm00105259-developing-applications-on-stm32cube-with-fatfs-stmicroelectronics.pdf
 - http://elm-chan.org/fsw/ff/00index_e.html
 - https://community.st.com/s/question/0D50X00009XkhhjSAB/sdio-fatfs-speed-problem
+
+# ICM0689 IMU code:
+- https://github.com/adayimaxiga/icm20689_dmp_driver/tree/master/icm20689%E7%A7%BB%E6%A4%8D%E7%89%88%E6%9C%ACdemo

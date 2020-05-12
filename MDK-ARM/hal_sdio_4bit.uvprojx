@@ -419,6 +419,21 @@
               <FileType>1</FileType>
               <FilePath>../Src/stm32f4xx_hal_msp.c</FilePath>
             </File>
+            <File>
+              <FileName>spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>icm20689.lib</FileName>
+              <FileType>4</FileType>
+              <FilePath>..\Src\icm20689.lib</FilePath>
+            </File>
+            <File>
+              <FileName>driver_icm20689.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\driver_icm20689.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -523,6 +538,16 @@
               <FileName>stm32f4xx_hal_rng.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_rng.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_ll_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_ll_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f4xx_hal_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_spi.c</FilePath>
             </File>
           </Files>
         </Group>

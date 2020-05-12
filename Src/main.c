@@ -22,15 +22,16 @@
 #include "main.h"
 #include "fatfs.h"
 #include "string.h"
-//DIR dirj;
+#include "spi.h"
+#include "driver_icm20689.h"
 FATFS   fatfs; 		/* FAT File System */
 FRESULT fresult;  /* FAT File Result */
 FIL			myfile;		/* FILE Instance */
 DIR dir;
 FILINFO fno;
-uint8_t write_data[]="Hello!\nThis is my friend.";
-uint32_t byte_cnt = 0;
-uint8_t rx_buffer[100],byte_read;
+//uint8_t write_data[]="Hello!\nThis is my friend.";
+//uint32_t byte_cnt = 0;
+//uint8_t rx_buffer[100], byte_read;
 
 
 /* Private variables ---------------------------------------------------------*/
@@ -86,10 +87,13 @@ uint8_t log_file_name[10]="xtx.txt";
 
 RNG_HandleTypeDef hrng;
 volatile uint32_t rng_result;
-float rng_result_f;
-HAL_RNG_StateTypeDef rng_state;
+float uint32_to_float;
 float l_timestamp;
-char buffer_to_sd[300];
+char buffer_to_sd[150];
+float yaw,pitch,roll;
+s16 ax,ay,az;
+s16 gx,gy,gz;
+	
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -114,13 +118,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-	
+	MX_SPI1_Init();
 	MX_RNG_Init();
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 	UART_PRINTF_Init();
-
+	icm20689_dmp_setup();
 	printf("Init SD card...!\n\r");
 	if (init_log_sd()) {
 		printf("Check the SDcard's presence!\n\r");
@@ -128,10 +132,8 @@ int main(void)
 	else {
 		create_log_file();
 	}
-	//char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
 	
 	float pre_tick;
-	
 	pre_tick = HAL_GetTick();
 	
 	/* USER CODE END 2 */
@@ -140,13 +142,13 @@ int main(void)
 	{
 		l_timestamp = (HAL_GetTick() - pre_tick)*0.001f;
 		do_sd_logging();
-		/*
-		While loop = 100Hz
-		*/
-
-		f_sync(&myfile);	
-
-		HAL_Delay(20);
+		
+		get_dmp_data(&yaw,&pitch,&roll);
+		MPU_Get_Gyroscope(&gx,&gy,&gz);
+		MPU_Get_Accelerometer(&ax,&ay,&az);
+		
+		HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12|GPIO_PIN_14);
+		HAL_Delay(10);
 		
 	}
 }
@@ -154,31 +156,34 @@ void do_sd_logging(void) {
 		char temp[20];
 		sprintf(temp, "%0.3f ", l_timestamp);
 		/*
-		The first data so we can use strcpy instead of strcat
+			The first data so we can use strcpy instead of strcat
 		*/
-		strcpy(buffer_to_sd, temp);
+		strcpy(buffer_to_sd, strcat(temp, "\t"));
 		
-		rng_state = HAL_RNG_GetState(&hrng);
-		if (rng_state == HAL_RNG_STATE_READY) {
+		if (HAL_RNG_GetState(&hrng) == HAL_RNG_STATE_READY) {
 			rng_result = HAL_RNG_GetRandomNumber(&hrng);
-			rng_result_f = ieee_float(rng_result);
+			uint32_to_float = ieee_float(rng_result);
 		}
+		/*
+			List of variables 
+		*/
+		write_to_sd_buffer(buffer_to_sd, (float)rng_result);
 
-		write_to_sd_buffer(buffer_to_sd, rng_result);
-
-		write_to_sd_buffer(buffer_to_sd, (float)rng_result/33.0f);
-
-		write_to_sd_buffer(buffer_to_sd, -233.0f);
+		write_to_sd_buffer(buffer_to_sd, roll);
+		write_to_sd_buffer(buffer_to_sd, pitch);
+		write_to_sd_buffer(buffer_to_sd, yaw);
+		//write_to_sd_buffer(buffer_to_sd, -233.0f);
 
 		strcat(buffer_to_sd, "\r");
 		
 		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
-			printf("%s\n\r", strcat(buffer_to_sd,"\0"));
+		printf("%s\n\r", strcat(buffer_to_sd,"\0"));
+		f_sync(&myfile);	
 }
 void write_to_sd_buffer(char buff[], float log_data) {
 		char temp2[20];
 		sprintf(temp2, "%0.3f ", log_data);
-		strcat(buff, temp2);
+		strcat(buff, strcat(temp2, "\t"));
 }
 uint8_t	init_log_sd(void) {
 		if(BSP_SD_Init() == MSD_OK)
@@ -280,7 +285,7 @@ void create_log_file(void) {
 		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
 		f_sync(&myfile);
 		/*
-		Close here and then open again, in order to fix the file won't save at first
+			Close here and then open again, in order to fix the file won't save at first
 		*/
 		f_close(&myfile);
 		fresult = f_open(&myfile, (const TCHAR*)log_file_name, FA_OPEN_EXISTING|FA_WRITE);
@@ -398,13 +403,27 @@ static void MX_RNG_Init(void) {
   */
 static void MX_GPIO_Init(void)
 {
-
+  GPIO_InitTypeDef GPIO_InitStruct;
 	/* GPIO Ports Clock Enable */
 	__HAL_RCC_GPIOH_CLK_ENABLE();
 	__HAL_RCC_GPIOC_CLK_ENABLE();
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOD_CLK_ENABLE();
 
+  /*Configure GPIO pin : PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+	
+  /*Configure GPIO pin : PD2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 }
 
 /* USER CODE BEGIN 4 */
