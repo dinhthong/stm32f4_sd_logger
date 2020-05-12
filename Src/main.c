@@ -62,7 +62,7 @@ UART_HandleTypeDef UartHandle;
   #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 UINT BytesWritten;
-uint8_t file_name[10]="6t5.txt";
+uint8_t file_name[10]="12t5.txt";
 char* path;
 	
 	
@@ -149,7 +149,7 @@ int main(void)
 		start_cnt = HAL_GetTick();
 		char dum_str[256] = "zzzzzzzzzzzaaaaaaaaaaaaaaaaqqqqqqqqqqqqqqqqqqqqqqqqqqxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxzzzHelloworldcxzcxzcxzczczczcxzcxzcxzcxzcxzcxxxxxxxxxxsssssssssssaaaaaaqqqqqqqqqqq\n\r";
 		//uint32_t byte_cnt;
-		for (m = 0; m < 15000; m++) {
+		for (m = 0; m < 1500; m++) {
 				fresult = f_write(&myfile, dum_str, strlen(dum_str), &BytesWritten);
 				byte_cnt+=BytesWritten;
 		}
@@ -157,10 +157,13 @@ int main(void)
 		f_sync(&myfile);					
 		f_close(&myfile);
 		stop_cnt = HAL_GetTick();
-		write_speed = (float)byte_cnt/((stop_cnt - start_cnt)*0.000001f);
-		float write_speed_mb;
-		write_speed_mb = write_speed/1024.0f/1024.0f/8.0f;
-				printf("write speed in MB/s: %f\n\r", write_speed_mb);
+float written_mb;
+				written_mb = (float)byte_cnt/1024.0f/1024.0f;
+	printf("written mega bytes: %f\n\r", written_mb);
+		write_speed = (float)written_mb*1024/((stop_cnt - start_cnt)*0.001f);
+
+		//write_speed_mb = write_speed;
+				printf("write speed in KB/s: %f\n\r", write_speed);
 /*
 	list dir content code
 	prior to calling this code, sd is mounted
@@ -217,18 +220,51 @@ int main(void)
 			}
 /**/
 			
-			
+			f_sync(&myfile);		
 			fresult = f_close(&myfile); // DIR.TXT
-			f_mount(NULL, "", 1);
+		//	f_mount(NULL, "", 1);
 		}
 	}
 	else {
 		printf("init SD card failed!\n\r");
 	}
+	
+//	fresult = f_open(&myfile, "LOG_COPTER.TXT", FA_CREATE_ALWAYS | FA_WRITE);
+	
+			fresult = f_open(&myfile, "LOG.TXT", FA_CREATE_NEW);
+		if (fresult != FR_OK) {
+			if (fresult == FR_EXIST) {
+				printf("file name is already exist!\n\r");
+				printf("try to overridely create a new file\n\r");
+				fresult = f_open(&myfile, "LOG.TXT", FA_CREATE_ALWAYS|FA_WRITE);
+				if (fresult != FR_OK) {
+					Error_Handler();
+				}
+				printf("override file ok\n\r");
+			}
+		}
+		else {
+			printf("created a new file ok\n\r");
+		}
+			
+		printf("Open file successfully\n\r");
+		char copter_test_str[] = "Hello I'm Thong\n\r";
+		fresult = f_write(&myfile, copter_test_str, strlen(copter_test_str), &BytesWritten);
+				f_sync(&myfile);					
+		//f_close(&myfile);
+		//f_mount(NULL, "", 1);
+		char copter_test_str2[] = "22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f 22.000f 4.3232412f -33.52f 1230.f\r";
 	while (1)
 	{
-		printf("\n\r While loop\n\r");
-		HAL_Delay(1500);
+		//printf("\n\r While loop\n\r");
+		/*
+		While loop = 100Hz
+		*/
+		
+		fresult = f_write(&myfile, copter_test_str2, strlen(copter_test_str2), &BytesWritten);
+		f_sync(&myfile);	
+		HAL_Delay(10);
+		
 	}
 }
 
