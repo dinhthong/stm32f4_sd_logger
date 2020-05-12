@@ -83,6 +83,9 @@ char str_dct[256];
 float write_speed;
 uint16_t m;
 uint32_t start_cnt, stop_cnt;
+RNG_HandleTypeDef rng;
+volatile uint32_t rng_result;
+HAL_RNG_StateTypeDef rng_state;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -107,6 +110,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+	
+	//RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_RNG, ENABLE);
+	rng.Instance = RNG;
+	HAL_RNG_Init(&rng);
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
@@ -236,7 +243,10 @@ int main(void)
 		//printf("%s", strcat(buffer_to_sd,"\0"));
 		fresult = f_write(&myfile, buffer_to_sd, strlen(buffer_to_sd), &BytesWritten);
 		f_sync(&myfile);	
-		
+		rng_state = HAL_RNG_GetState(&rng);
+		if (rng_state == HAL_RNG_STATE_READY) {
+			rng_result = HAL_RNG_GetRandomNumber(&rng);
+		}
 		HAL_Delay(100);
 		
 	}

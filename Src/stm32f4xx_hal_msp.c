@@ -181,7 +181,9 @@ void HAL_SD_MspDeInit(SD_HandleTypeDef* hsd)
   }
 
 }
-
+void HAL_RNG_MspInit(RNG_HandleTypeDef *hrng) {
+	__HAL_RCC_RNG_CLK_ENABLE();
+}
 /* USER CODE BEGIN 1 */
 
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
